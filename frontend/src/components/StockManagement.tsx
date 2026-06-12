@@ -3,6 +3,7 @@ import { storageService } from "../services/storage";
 import { Plus, Edit, Trash2, MapPin, X } from "lucide-react";
 import { CATEGORIES, KIDS_SUB, FOOTWEAR_TYPES, STOCK_STATUSES } from "../constants/productOptions";
 import { Stock, Brand } from "../types/models";
+import { ComboBox } from "./ComboBox";
 
 const emptyForm = {
   brandId: "", subBrand: "", article: "", category: "", kidsSubCategory: "",
@@ -29,6 +30,74 @@ export function StockManagement() {
   };
 
   const margin = formData.sellingPrice - formData.purchasePrice;
+
+  // Extract unique options from current stock for autocomplete suggestions
+  const uniqueSizes = Array.from(new Set(footwear.map(item => String(item.size)))).filter(Boolean).sort((a, b) => Number(a) - Number(b));
+  const uniqueColors = Array.from(new Set(footwear.map(item => item.product.color))).filter(Boolean).sort();
+  const uniqueSections = Array.from(new Set(footwear.map(item => item.section))).filter(Boolean).sort();
+  const uniqueRacks = Array.from(new Set(footwear.map(item => item.rack))).filter(Boolean).sort();
+  const uniqueShelves = Array.from(new Set(footwear.map(item => item.shelf))).filter(Boolean).sort();
+
+  // Keyboard navigation focus handlers
+  const focusNext = (current: HTMLElement) => {
+    const form = current.closest("form");
+    if (!form) return;
+    const elements = Array.from(
+      form.querySelectorAll("input:not([disabled]):not([readonly]), select:not([disabled]), button[type='submit']")
+    ) as HTMLElement[];
+    const index = elements.indexOf(current);
+    if (index >= 0 && index < elements.length - 1) {
+      const nextEl = elements[index + 1];
+      nextEl.focus();
+      if (nextEl instanceof HTMLInputElement) {
+        nextEl.select();
+      }
+    }
+  };
+
+  const focusPrev = (current: HTMLElement) => {
+    const form = current.closest("form");
+    if (!form) return;
+    const elements = Array.from(
+      form.querySelectorAll("input:not([disabled]):not([readonly]), select:not([disabled]), button[type='submit']")
+    ) as HTMLElement[];
+    const index = elements.indexOf(current);
+    if (index > 0) {
+      const prevEl = elements[index - 1];
+      prevEl.focus();
+      if (prevEl instanceof HTMLInputElement) {
+        prevEl.select();
+      }
+    }
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === "Tab") {
+      return; // Let browser Tab and Shift+Tab work naturally
+    }
+    const target = e.target as HTMLElement;
+    if (target.tagName !== "INPUT" && target.tagName !== "SELECT") {
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      // If it's a text input, only shift focus if cursor is at the end of the text
+      if (target instanceof HTMLInputElement && target.type !== "number" && target.selectionEnd !== target.value.length) {
+        return;
+      }
+      e.preventDefault();
+      focusNext(target);
+    } else if (e.key === "ArrowLeft") {
+      // If it's a text input, only shift focus if cursor is at the beginning of the text
+      if (target instanceof HTMLInputElement && target.type !== "number" && target.selectionStart !== 0) {
+        return;
+      }
+      e.preventDefault();
+      focusPrev(target);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      focusNext(target);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,7 +195,7 @@ export function StockManagement() {
             <h2 className="text-xl font-semibold">{editingId ? "Edit Stock" : "Add Stock"}</h2>
             <X className="cursor-pointer" onClick={resetForm} />
           </div>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium">Brand</label>
               <select required disabled={editingId !== null} value={formData.brandId}
@@ -140,12 +209,14 @@ export function StockManagement() {
               <label className="text-sm font-medium">Sub Brand</label>
               <input type="text" disabled={editingId !== null} value={formData.subBrand}
                 onChange={(e) => setFormData({ ...formData, subBrand: e.target.value })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" placeholder="e.g. Campus" />
             </div>
             <div>
               <label className="text-sm font-medium">Article</label>
               <input type="text" disabled={editingId !== null} value={formData.article}
                 onChange={(e) => setFormData({ ...formData, article: e.target.value })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" placeholder="e.g. ART-1024" required />
             </div>
             <div>
@@ -179,50 +250,53 @@ export function StockManagement() {
             </div>
             <div>
               <label className="text-sm font-medium">Size</label>
-              <input type="text" required value={formData.size}
-                onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-                className="w-full border p-2 rounded" placeholder="e.g. 7" />
+              <ComboBox value={formData.size}
+                onChange={(val) => setFormData({ ...formData, size: val })}
+                options={uniqueSizes} placeholder="e.g. 7" required />
             </div>
             <div>
               <label className="text-sm font-medium">Color</label>
-              <input type="text" required disabled={editingId !== null} value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                className="w-full border p-2 rounded" />
+              <ComboBox disabled={editingId !== null} value={formData.color}
+                onChange={(val) => setFormData({ ...formData, color: val })}
+                options={uniqueColors} placeholder="e.g. Black" required />
             </div>
             <div>
               <label className="text-sm font-medium">Section</label>
-              <input type="text" required value={formData.section}
-                onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                className="w-full border p-2 rounded" />
+              <ComboBox value={formData.section}
+                onChange={(val) => setFormData({ ...formData, section: val })}
+                options={uniqueSections} placeholder="e.g. A" required />
             </div>
             <div>
               <label className="text-sm font-medium">Rack</label>
-              <input type="text" required value={formData.rack}
-                onChange={(e) => setFormData({ ...formData, rack: e.target.value })}
-                className="w-full border p-2 rounded" />
+              <ComboBox value={formData.rack}
+                onChange={(val) => setFormData({ ...formData, rack: val })}
+                options={uniqueRacks} placeholder="e.g. R1" required />
             </div>
             <div>
               <label className="text-sm font-medium">Shelf</label>
-              <input type="text" required value={formData.shelf}
-                onChange={(e) => setFormData({ ...formData, shelf: e.target.value })}
-                className="w-full border p-2 rounded" />
+              <ComboBox value={formData.shelf}
+                onChange={(val) => setFormData({ ...formData, shelf: val })}
+                options={uniqueShelves} placeholder="e.g. S1" required />
             </div>
             <div>
               <label className="text-sm font-medium">Purchase Price (₹)</label>
               <input type="number" required value={formData.purchasePrice || ""}
                 onChange={(e) => setFormData({ ...formData, purchasePrice: Number(e.target.value) })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" />
             </div>
             <div>
               <label className="text-sm font-medium">MRP (₹)</label>
               <input type="number" required value={formData.mrp || ""}
                 onChange={(e) => setFormData({ ...formData, mrp: Number(e.target.value) })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" />
             </div>
             <div>
               <label className="text-sm font-medium">Selling Price (₹)</label>
               <input type="number" required value={formData.sellingPrice || ""}
                 onChange={(e) => setFormData({ ...formData, sellingPrice: Number(e.target.value) })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" />
             </div>
             <div>
@@ -234,6 +308,7 @@ export function StockManagement() {
               <label className="text-sm font-medium">Quantity</label>
               <input type="number" required value={formData.quantity || ""}
                 onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                onFocus={(e) => e.target.select()}
                 className="w-full border p-2 rounded" />
             </div>
             {editingId && (

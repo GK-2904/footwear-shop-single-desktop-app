@@ -19,7 +19,7 @@ export function LowStockDetail() {
         </button>
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Low Stock Items</h1>
-          <p className="text-slate-500">All size stocks with quantity 5 or less</p>
+          <p className="text-slate-500">All size stocks with quantity 2 or less</p>
         </div>
       </div>
 

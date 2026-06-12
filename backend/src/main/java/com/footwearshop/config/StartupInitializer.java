@@ -30,5 +30,12 @@ public class StartupInitializer implements CommandLineRunner {
 
         // Run database migration/initialization for Financial Years
         financialYearService.initFinancialYears();
+
+        // Ensure there is always an active financial year initialized
+        try {
+            financialYearService.getActiveFinancialYear();
+        } catch (Exception e) {
+            System.err.println("Failed to auto-initialize active financial year: " + e.getMessage());
+        }
     }
 }

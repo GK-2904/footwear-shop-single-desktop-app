@@ -17,7 +17,7 @@ export interface LowStockRow {
   stockStatus: string;
 }
 
-const LOW_STOCK_THRESHOLD = 5;
+const LOW_STOCK_THRESHOLD = 2;
 
 export async function fetchLowStockRows(): Promise<LowStockRow[]> {
   const stocks = await storageService.getSizeStock();
