@@ -126,6 +126,10 @@ export function StockManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const actionLabel = editingId ? "update" : "save";
+    if (!window.confirm(`Are you sure you want to ${actionLabel} this stock item?`)) {
+      return;
+    }
     if (editingId) {
       await storageService.updateStock(editingId, {
         size: Number(formData.size),
@@ -216,7 +220,8 @@ export function StockManagement() {
 
   // Filter stock items based on search term and filters
   const filteredFootwear = footwear.filter((item) => {
-    const matchesSearch = [
+    const matchesSearch = !searchTerm ? true : [
+      String(item.id),
       item.product.brand?.name,
       item.product.subBrand,
       item.product.article,
@@ -224,8 +229,10 @@ export function StockManagement() {
       item.product.type,
       item.product.color,
       String(item.size),
-      `${item.section}-${item.rack}-${item.shelf}`
-    ].some(field => field?.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.section,
+      item.rack,
+      item.shelf
+    ].some(field => field && String(field).toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesBrand = filterBrand === "" || item.product.brand?.name === filterBrand;
     const matchesCategory = filterCategory === "" || item.product.category === filterCategory;
@@ -415,7 +422,7 @@ export function StockManagement() {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-gray-500 uppercase">
-              {["Brand", "Sub Brand", "Article", "Category", "Type", "Size", "Color", "Location",
+              {["Stock ID", "Brand", "Sub Brand", "Article", "Category", "Type", "Size", "Color", "Location",
                 "Purchase", "MRP", "Selling", "Margin", "Qty", "Status", "Actions"].map((h) => (
                 <th key={h} className="p-2">{h}</th>
               ))}
@@ -426,6 +433,7 @@ export function StockManagement() {
               const m = Number(item.sellingPrice) - Number(item.purchasePrice);
               return (
                 <tr key={item.id} className="border-t">
+                  <td className="p-2 font-mono text-xs text-slate-500">#{item.id}</td>
                   <td className="p-2">{item.product.brand?.name}</td>
                   <td className="p-2">{item.product.subBrand || "-"}</td>
                   <td className="p-2">{item.product.article || "-"}</td>

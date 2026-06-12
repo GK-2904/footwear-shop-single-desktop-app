@@ -26,9 +26,11 @@ export function ComboBox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastValidatedValue = useRef<string>(value);
+  const [addedOptions, setAddedOptions] = useState<string[]>([]);
 
-  // Filter options based on input value
-  const filteredOptions = options.filter((option) =>
+  // Filter options based on input value (including custom added options)
+  const mergedOptions = Array.from(new Set([...options, ...addedOptions]));
+  const filteredOptions = mergedOptions.filter((option) =>
     option.toLowerCase().includes(value.toLowerCase())
   );
 
@@ -65,7 +67,7 @@ export function ComboBox({
     }
 
     // Check if exists
-    const match = options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
+    const match = mergedOptions.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
     if (match) {
       lastValidatedValue.current = match;
       if (match !== value) {
@@ -77,6 +79,7 @@ export function ComboBox({
       const confirmAdd = window.confirm(`Create new ${displayLabel}: "${trimmed}"?`);
       if (confirmAdd) {
         lastValidatedValue.current = trimmed;
+        setAddedOptions((prev) => [...prev, trimmed]);
         onChange(trimmed);
       } else {
         lastValidatedValue.current = ""; // Reset

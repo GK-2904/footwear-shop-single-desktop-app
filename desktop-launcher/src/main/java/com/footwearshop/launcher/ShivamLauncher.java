@@ -5,6 +5,7 @@ import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.layout.StackPane;
@@ -62,6 +63,26 @@ public class ShivamLauncher extends Application {
         hideSplash();
 
         WebView webView = new WebView();
+
+        // Handle JS window.alert()
+        webView.getEngine().setOnAlert(event -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(APP_TITLE);
+            alert.setHeaderText(null);
+            alert.setContentText(event.getData());
+            alert.showAndWait();
+        });
+
+        // Handle JS window.confirm()
+        webView.getEngine().setConfirmHandler(message -> {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle(APP_TITLE);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            java.util.Optional<ButtonType> result = alert.showAndWait();
+            return result.isPresent() && result.get() == ButtonType.OK;
+        });
+
         webView.getEngine().load(ServerWaiter.appUrl());
 
         Scene scene = new Scene(webView);
