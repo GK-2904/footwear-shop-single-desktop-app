@@ -16,13 +16,16 @@ public class FootwearSizeStockServiceImpl implements FootwearSizeStockService {
 
     private final FootwearSizeStockRepository stockRepository;
     private final FootwearProductRepository productRepository;
+    private final com.footwearshop.repository.BillItemRepository billItemRepository;
 
     public FootwearSizeStockServiceImpl(
             FootwearSizeStockRepository stockRepository,
-            FootwearProductRepository productRepository
+            FootwearProductRepository productRepository,
+            com.footwearshop.repository.BillItemRepository billItemRepository
     ) {
         this.stockRepository = stockRepository;
         this.productRepository = productRepository;
+        this.billItemRepository = billItemRepository;
     }
 
     @Override
@@ -186,6 +189,14 @@ public class FootwearSizeStockServiceImpl implements FootwearSizeStockService {
 
     @Override
     public void deleteStock(Long stockId) {
+        FootwearSizeStock stock = stockRepository.findById(stockId)
+                .orElseThrow(() -> new IllegalArgumentException("Stock not found"));
+        
+        boolean inUse = billItemRepository.existsByProduct_IdAndSize(stock.getProduct().getId(), stock.getSize());
+        if (inUse) {
+            throw new IllegalArgumentException("Stock item is currently in use in sales and cannot be deleted.");
+        }
+        
         stockRepository.deleteById(stockId);
     }
 }

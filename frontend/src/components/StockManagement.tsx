@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { storageService } from "../services/storage";
-import { Plus, Edit, Trash2, MapPin, X } from "lucide-react";
+import { Plus, Edit, Trash2, MapPin, X, Search } from "lucide-react";
 import { CATEGORIES, KIDS_SUB, FOOTWEAR_TYPES, STOCK_STATUSES } from "../constants/productOptions";
 import { Stock, Brand } from "../types/models";
 import { ComboBox } from "./ComboBox";
 
 const emptyForm = {
-  brandId: "", subBrand: "", article: "", category: "", kidsSubCategory: "",
+  brandName: "", subBrand: "", article: "", category: "", kidsSubCategory: "",
   type: "", size: "", color: "", section: "", rack: "", shelf: "",
   purchasePrice: 0, mrp: 0, sellingPrice: 0, quantity: 0, stockStatus: "ACTIVE",
 };
@@ -17,8 +17,22 @@ export function StockManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterBrand, setFilterBrand] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      setTimeout(() => {
+        const firstInput = document.getElementById("brand-select") || document.querySelector("form input, form select");
+        if (firstInput instanceof HTMLElement) {
+          firstInput.focus();
+        }
+      }, 50);
+    }
+  }, [showForm]);
 
   const loadData = async () => {
     const [products, brandsData] = await Promise.all([
@@ -32,6 +46,17 @@ export function StockManagement() {
   const margin = formData.sellingPrice - formData.purchasePrice;
 
   // Extract unique options from current stock for autocomplete suggestions
+  const uniqueBrandNames = brands.map(b => b.name).sort();
+  const uniqueCategories = Array.from(new Set([
+    ...CATEGORIES,
+    ...footwear.map(item => item.product.category)
+  ])).filter(Boolean).sort();
+  const uniqueTypes = Array.from(new Set([
+    ...FOOTWEAR_TYPES,
+    ...footwear.map(item => item.product.type)
+  ])).filter(Boolean).sort();
+  const uniqueSubBrands = Array.from(new Set(footwear.map(item => item.product.subBrand))).filter(Boolean).sort();
+  const uniqueArticles = Array.from(new Set(footwear.map(item => item.product.article))).filter(Boolean).sort();
   const uniqueSizes = Array.from(new Set(footwear.map(item => String(item.size)))).filter(Boolean).sort((a, b) => Number(a) - Number(b));
   const uniqueColors = Array.from(new Set(footwear.map(item => item.product.color))).filter(Boolean).sort();
   const uniqueSections = Array.from(new Set(footwear.map(item => item.section))).filter(Boolean).sort();
@@ -114,8 +139,19 @@ export function StockManagement() {
         shelf: formData.shelf,
       });
     } else {
+      // Auto create brand if it's a new brand name typed in ComboBox
+      let brandObj = brands.find(b => b.name.toLowerCase() === formData.brandName.toLowerCase());
+      let brandId: number;
+      if (!brandObj) {
+        const newBrand = await storageService.addBrand({ name: formData.brandName });
+        brandId = newBrand.id!;
+        setBrands(prev => [...prev, newBrand]);
+      } else {
+        brandId = brandObj.id!;
+      }
+
       const product = await storageService.addFootwear({
-        brandId: Number(formData.brandId),
+        brandId: brandId,
         subBrand: formData.subBrand,
         article: formData.article,
         category: formData.category,
@@ -146,7 +182,7 @@ export function StockManagement() {
 
   const handleEdit = (item: Stock) => {
     setFormData({
-      brandId: String(item.product.brand?.id || ""),
+      brandName: item.product.brand?.name || "",
       subBrand: item.product.subBrand || "",
       article: item.product.article || "",
       category: item.product.category || "",
@@ -168,11 +204,34 @@ export function StockManagement() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Delete this stock item?")) {
-      await storageService.deleteStock(id);
-      loadData();
+    if (confirm("Are you sure you want to delete this stock item?")) {
+      try {
+        await storageService.deleteStock(id);
+        loadData();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to delete stock");
+      }
     }
   };
+
+  // Filter stock items based on search term and filters
+  const filteredFootwear = footwear.filter((item) => {
+    const matchesSearch = [
+      item.product.brand?.name,
+      item.product.subBrand,
+      item.product.article,
+      item.product.category,
+      item.product.type,
+      item.product.color,
+      String(item.size),
+      `${item.section}-${item.rack}-${item.shelf}`
+    ].some(field => field?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesBrand = filterBrand === "" || item.product.brand?.name === filterBrand;
+    const matchesCategory = filterCategory === "" || item.product.category === filterCategory;
+
+    return matchesSearch && matchesBrand && matchesCategory;
+  });
 
   const resetForm = () => {
     setFormData(emptyForm);
@@ -198,35 +257,27 @@ export function StockManagement() {
           <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium">Brand</label>
-              <select required disabled={editingId !== null} value={formData.brandId}
-                onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
-                className="w-full border p-2 rounded">
-                <option value="">Select Brand</option>
-                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <ComboBox id="brand-select" disabled={editingId !== null} value={formData.brandName}
+                onChange={(val) => setFormData({ ...formData, brandName: val })}
+                options={uniqueBrandNames} placeholder="e.g. Paragone" required label="Brand" />
             </div>
             <div>
               <label className="text-sm font-medium">Sub Brand</label>
-              <input type="text" disabled={editingId !== null} value={formData.subBrand}
-                onChange={(e) => setFormData({ ...formData, subBrand: e.target.value })}
-                onFocus={(e) => e.target.select()}
-                className="w-full border p-2 rounded" placeholder="e.g. Campus" />
+              <ComboBox disabled={editingId !== null} value={formData.subBrand}
+                onChange={(val) => setFormData({ ...formData, subBrand: val })}
+                options={uniqueSubBrands} placeholder="e.g. Campus" required label="Sub Brand" />
             </div>
             <div>
               <label className="text-sm font-medium">Article</label>
-              <input type="text" disabled={editingId !== null} value={formData.article}
-                onChange={(e) => setFormData({ ...formData, article: e.target.value })}
-                onFocus={(e) => e.target.select()}
-                className="w-full border p-2 rounded" placeholder="e.g. ART-1024" required />
+              <ComboBox disabled={editingId !== null} value={formData.article}
+                onChange={(val) => setFormData({ ...formData, article: val })}
+                options={uniqueArticles} placeholder="e.g. ART-1024" required label="Article" />
             </div>
             <div>
               <label className="text-sm font-medium">Category</label>
-              <select required disabled={editingId !== null} value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value, kidsSubCategory: "" })}
-                className="w-full border p-2 rounded">
-                <option value="">Select</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <ComboBox disabled={editingId !== null} value={formData.category}
+                onChange={(val) => setFormData({ ...formData, category: val, kidsSubCategory: "" })}
+                options={uniqueCategories} placeholder="Select Category" required label="Category" />
             </div>
             {formData.category === "Kids" && (
               <div>
@@ -241,42 +292,39 @@ export function StockManagement() {
             )}
             <div>
               <label className="text-sm font-medium">Type</label>
-              <select required disabled={editingId !== null} value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full border p-2 rounded">
-                <option value="">Select Type</option>
-                {FOOTWEAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <ComboBox disabled={editingId !== null} value={formData.type}
+                onChange={(val) => setFormData({ ...formData, type: val })}
+                options={uniqueTypes} placeholder="Select Type" required label="Type" />
             </div>
             <div>
               <label className="text-sm font-medium">Size</label>
               <ComboBox value={formData.size}
                 onChange={(val) => setFormData({ ...formData, size: val })}
-                options={uniqueSizes} placeholder="e.g. 7" required />
+                options={uniqueSizes} placeholder="e.g. 7" required label="Size" />
             </div>
             <div>
               <label className="text-sm font-medium">Color</label>
               <ComboBox disabled={editingId !== null} value={formData.color}
                 onChange={(val) => setFormData({ ...formData, color: val })}
-                options={uniqueColors} placeholder="e.g. Black" required />
+                options={uniqueColors} placeholder="e.g. Black" required label="Color" />
             </div>
             <div>
               <label className="text-sm font-medium">Section</label>
               <ComboBox value={formData.section}
                 onChange={(val) => setFormData({ ...formData, section: val })}
-                options={uniqueSections} placeholder="e.g. A" required />
+                options={uniqueSections} placeholder="e.g. A" required label="Section" />
             </div>
             <div>
               <label className="text-sm font-medium">Rack</label>
               <ComboBox value={formData.rack}
                 onChange={(val) => setFormData({ ...formData, rack: val })}
-                options={uniqueRacks} placeholder="e.g. R1" required />
+                options={uniqueRacks} placeholder="e.g. R1" required label="Rack" />
             </div>
             <div>
               <label className="text-sm font-medium">Shelf</label>
               <ComboBox value={formData.shelf}
                 onChange={(val) => setFormData({ ...formData, shelf: val })}
-                options={uniqueShelves} placeholder="e.g. S1" required />
+                options={uniqueShelves} placeholder="e.g. S1" required label="Shelf" />
             </div>
             <div>
               <label className="text-sm font-medium">Purchase Price (₹)</label>
@@ -306,10 +354,10 @@ export function StockManagement() {
             </div>
             <div>
               <label className="text-sm font-medium">Quantity</label>
-              <input type="number" required value={formData.quantity || ""}
-                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                onFocus={(e) => e.target.select()}
-                className="w-full border p-2 rounded" />
+              <ComboBox value={String(formData.quantity || "")}
+                onChange={(val) => setFormData({ ...formData, quantity: Number(val) })}
+                options={["1", "2", "3", "4", "5", "10", "12", "24", "36", "48", "50", "100"]}
+                placeholder="e.g. 12" required label="Quantity" />
             </div>
             {editingId && (
               <div>
@@ -331,6 +379,38 @@ export function StockManagement() {
         </div>
       )}
 
+      {/* Real-time Search and Filter Panel */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            placeholder="Search brand, article, category, type, location..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+          />
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+        </div>
+        <div className="flex gap-3 w-full md:w-auto">
+          <select
+            value={filterBrand}
+            onChange={(e) => setFilterBrand(e.target.value)}
+            className="border p-2 rounded-xl text-sm w-full md:w-40 outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+          >
+            <option value="">All Brands</option>
+            {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+          </select>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="border p-2 rounded-xl text-sm w-full md:w-40 outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+          >
+            <option value="">All Categories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow p-6 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -342,7 +422,7 @@ export function StockManagement() {
             </tr>
           </thead>
           <tbody>
-            {footwear.map((item) => {
+            {filteredFootwear.map((item) => {
               const m = Number(item.sellingPrice) - Number(item.purchasePrice);
               return (
                 <tr key={item.id} className="border-t">

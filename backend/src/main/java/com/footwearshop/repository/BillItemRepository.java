@@ -10,4 +10,6 @@ public interface BillItemRepository extends JpaRepository<BillItem,Long> {
     List<BillItem> findByBill_Id(Long billId);
 
     List<BillItem> findByProduct_Id(Long productId);
+
+    boolean existsByProduct_IdAndSize(Long productId, Integer size);
 }

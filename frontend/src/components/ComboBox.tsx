@@ -8,6 +8,7 @@ interface ComboBoxProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  label?: string;
 }
 
 export function ComboBox({
@@ -17,12 +18,14 @@ export function ComboBox({
   options,
   placeholder,
   required,
-  disabled
+  disabled,
+  label
 }: ComboBoxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastValidatedValue = useRef<string>(value);
 
   // Filter options based on input value
   const filteredOptions = options.filter((option) =>
@@ -40,9 +43,57 @@ export function ComboBox({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sync if value changes to something empty or exists in options (from external resets/updates)
+  useEffect(() => {
+    if (!value || options.some(opt => opt.toLowerCase() === value.toLowerCase())) {
+      lastValidatedValue.current = value;
+    }
+  }, [value, options]);
+
   const handleFocus = () => {
     setIsOpen(true);
     setHighlightedIndex(-1);
+  };
+
+  const validateAndConfirmNewValue = (val: string) => {
+    const trimmed = val.trim();
+    if (!trimmed) return;
+
+    // If we have already validated this value, skip validating again to avoid double confirm prompts
+    if (lastValidatedValue.current.toLowerCase() === trimmed.toLowerCase()) {
+      return;
+    }
+
+    // Check if exists
+    const match = options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
+    if (match) {
+      lastValidatedValue.current = match;
+      if (match !== value) {
+        onChange(match);
+      }
+    } else {
+      // If new, ask for confirmation
+      const displayLabel = label ? label.toLowerCase() : "option";
+      const confirmAdd = window.confirm(`Create new ${displayLabel}: "${trimmed}"?`);
+      if (confirmAdd) {
+        lastValidatedValue.current = trimmed;
+        onChange(trimmed);
+      } else {
+        lastValidatedValue.current = ""; // Reset
+        onChange(""); // Reset/clear
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    // Check if focus moved outside the ComboBox container after a short delay
+    setTimeout(() => {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
+        setIsOpen(false);
+        validateAndConfirmNewValue(value);
+      }
+    }, 150);
   };
 
   const selectOption = (opt: string) => {
@@ -74,8 +125,9 @@ export function ComboBox({
         e.stopPropagation(); // Prevents form focus-shifting or submit
         selectOption(filteredOptions[highlightedIndex]);
       } else {
-        // Otherwise, close the dropdown but allow enter key to shift focus (letting it propagate)
+        // Otherwise, close the dropdown, validate, and let Enter key propagate for focus shifting
         setIsOpen(false);
+        validateAndConfirmNewValue(value);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -97,6 +149,7 @@ export function ComboBox({
         }}
         onFocus={handleFocus}
         onClick={handleFocus}
+        onBlur={handleBlur}
         placeholder={placeholder}
         required={required}
         disabled={disabled}
@@ -128,3 +181,4 @@ export function ComboBox({
     </div>
   );
 }
+

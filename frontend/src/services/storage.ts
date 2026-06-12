@@ -137,7 +137,14 @@ export const storageService = {
 
   async deleteStock(stockId: number): Promise<void> {
     const res = await fetch(`${BASE_URL}/stocks/${stockId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete stock");
+    if (!res.ok) {
+      let msg = "Failed to delete stock";
+      try {
+        const body = await res.json();
+        msg = body.message || msg;
+      } catch {}
+      throw new Error(msg);
+    }
   },
 
   async getBills(): Promise<Bill[]> {
