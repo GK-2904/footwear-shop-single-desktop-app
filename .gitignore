@@ -1,5 +1,17 @@
-/node_modules
-/build
-/target
+node_modules/
+build/
+target/
 .env
 .DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Desktop Build Artifacts
+desktop/jre-cache/
+desktop/javafx-sdk/
+desktop/ShivamFootwear/
+desktop/ShivamFootwear-App/
+desktop/app-image-build/
+desktop/*.zip
