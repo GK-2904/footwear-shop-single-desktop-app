@@ -1,6 +1,8 @@
 @echo off
 title Shivam Footwear Shop - Stop
+set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%PATH%"
 echo Stopping Shivam Footwear Shop...
+
 
 taskkill /IM "ShivamFootwear.exe" /F >nul 2>&1
 taskkill /IM "Shivam Footwear.exe" /F >nul 2>&1

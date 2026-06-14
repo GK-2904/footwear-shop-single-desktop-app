@@ -82,6 +82,18 @@ $JreDest = Join-Path $OutputDir "jre"
 if (Test-Path $JreDest) { Remove-Item $JreDest -Recurse -Force -ErrorAction SilentlyContinue }
 Copy-Item -Path $JreCache -Destination $JreDest -Recurse -Force
 
+# Bundle JavaFX for fallback launcher (launch-desktop.bat) in portable folder
+Write-Host "`nBundling JavaFX for desktop launcher..." -ForegroundColor Yellow
+$JavafxSdk = & (Join-Path $PSScriptRoot "download-javafx.ps1")
+$JavafxLib = Join-Path $JavafxSdk "lib"
+$JavafxBin = Join-Path $JavafxSdk "bin"
+$JavafxDest = Join-Path $OutputDir "javafx"
+if (Test-Path $JavafxDest) { Remove-Item $JavafxDest -Recurse -Force -ErrorAction SilentlyContinue }
+New-Item -ItemType Directory -Path (Join-Path $JavafxDest "lib") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $JavafxDest "bin") -Force | Out-Null
+Copy-Item (Join-Path $JavafxLib "*") (Join-Path $JavafxDest "lib") -Force
+Copy-Item (Join-Path $JavafxBin "*.dll") (Join-Path $JavafxDest "bin") -Force
+
 # Create zip
 $ZipPath = Join-Path $PSScriptRoot "ShivamFootwear.zip"
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }

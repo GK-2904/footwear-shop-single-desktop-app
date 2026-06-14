@@ -1,8 +1,26 @@
 @echo off
 title Shivam Footwear Shop
+set "PATH=%SystemRoot%\System32;%SystemRoot%;%SystemRoot%\System32\Wbem;%PATH%"
 cd /d "%~dp0"
 
+REM If run from the raw desktop source folder, redirect to the built version
+if not exist "%~dp0app\footwear-backend.jar" (
+    if exist "%~dp0ShivamFootwear-App\Start Shivam Footwear.bat" (
+        echo Redirecting to built ShivamFootwear-App...
+        cd /d "%~dp0ShivamFootwear-App"
+        call "Start Shivam Footwear.bat"
+        exit /b 0
+    )
+    if exist "%~dp0ShivamFootwear\Start Shivam Footwear.bat" (
+        echo Redirecting to built ShivamFootwear portable folder...
+        cd /d "%~dp0ShivamFootwear"
+        call "Start Shivam Footwear.bat"
+        exit /b 0
+    )
+)
+
 echo ============================================
+
 echo   Shivam Footwear Shop - Starting...
 echo ============================================
 echo.
@@ -17,13 +35,14 @@ if %ERRORLEVEL% equ 0 (
 
 if "%USE_EXE%"=="1" if exist "%~dp0ShivamFootwear.exe" if exist "%~dp0app\ShivamFootwear.cfg" (
     echo Launching Shivam Footwear desktop app...
-    start "" "%~dp0ShivamFootwear.exe"
+    start "" /d "%~dp0" "%~dp0ShivamFootwear.exe"
     echo.
     echo App window will open shortly.
     echo To stop: close the window or run "Stop Shivam Footwear.bat"
     echo.
     exit /b 0
 )
+
 
 
 REM JavaFX desktop window (no browser) - reliable fallback

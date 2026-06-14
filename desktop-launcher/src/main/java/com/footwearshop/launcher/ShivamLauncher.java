@@ -22,41 +22,108 @@ public class ShivamLauncher extends Application {
     private final InstallPaths paths = new InstallPaths();
     private final BackendProcess backend = new BackendProcess(paths);
     private Stage splashStage;
+    private boolean useBrowserFallback = false;
 
     public static void main(String[] args) {
-        launch(args);
+        try {
+            launch(args);
+        } catch (Throwable t) {
+            System.err.println("JavaFX launch failed, falling back to browser mode: " + t.getMessage());
+            try {
+                fallbackToBrowserOnly();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private static void fallbackToBrowserOnly() throws Exception {
+        InstallPaths paths = new InstallPaths();
+        BackendProcess backend = new BackendProcess(paths);
+        if (!ServerWaiter.isPortInUse()) {
+            backend.start();
+            ServerWaiter.waitUntilReady();
+        }
+        openUrlInBrowser(ServerWaiter.appUrl());
+    }
+
+    private static void openUrlInBrowser(String url) throws Exception {
+        String os = System.getProperty("os.name").toLowerCase();
+        Runtime rt = Runtime.getRuntime();
+        if (os.contains("win")) {
+            rt.exec(new String[]{"rundll32", "url.dll,FileProtocolHandler", url});
+        } else if (os.contains("mac")) {
+            rt.exec(new String[]{"open", url});
+        } else {
+            rt.exec(new String[]{"xdg-open", url});
+        }
     }
 
     @Override
     public void start(Stage primaryStage) {
         if (ServerWaiter.isPortInUse()) {
-            // Backend still running from a previous session — open UI without starting another instance
-            openMainWindow(primaryStage);
+            try {
+                openMainWindow(primaryStage);
+            } catch (Throwable t) {
+                useBrowserFallback = true;
+                try {
+                    openUrlInBrowser(ServerWaiter.appUrl());
+                } catch (Exception ex) {
+                    showError("Failed to open browser fallback:\n" + ex.getMessage());
+                }
+                Platform.exit();
+            }
             return;
         }
 
-        showSplash();
-        Thread startupThread = new Thread(() -> {
+        try {
+            showSplash();
+            Thread startupThread = new Thread(() -> {
+                try {
+                    backend.start();
+                    ServerWaiter.waitUntilReady();
+                    Platform.runLater(() -> {
+                        try {
+                            openMainWindow(primaryStage);
+                        } catch (Throwable t) {
+                            useBrowserFallback = true;
+                            try {
+                                openUrlInBrowser(ServerWaiter.appUrl());
+                            } catch (Exception ex) {
+                                showError("Failed to open browser fallback:\n" + ex.getMessage());
+                            }
+                            Platform.exit();
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        hideSplash();
+                        showError("Failed to start Shivam Footwear:\n" + ex.getMessage());
+                        Platform.exit();
+                    });
+                }
+            }, "backend-startup");
+            startupThread.setDaemon(true);
+            startupThread.start();
+        } catch (Throwable t) {
+            useBrowserFallback = true;
             try {
                 backend.start();
                 ServerWaiter.waitUntilReady();
-                Platform.runLater(() -> openMainWindow(primaryStage));
+                openUrlInBrowser(ServerWaiter.appUrl());
             } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    hideSplash();
-                    showError("Failed to start Shivam Footwear:\n" + ex.getMessage());
-                    Platform.exit();
-                });
+                showError("Failed to start browser fallback:\n" + ex.getMessage());
             }
-        }, "backend-startup");
-        startupThread.setDaemon(true);
-        startupThread.start();
+            Platform.exit();
+        }
     }
 
     @Override
     public void stop() {
         hideSplash();
-        backend.stop();
+        if (!useBrowserFallback) {
+            backend.stop();
+        }
     }
 
     private void openMainWindow(Stage stage) {
